@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/edukira_dev
+    username: edukira
+    password: edukira123
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.edukira: DEBUG
+    org.flywaydb: DEBUG
