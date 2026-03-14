@@ -1,2 +1,8 @@
 package com.edukira.enums;
-public enum StudentStatus { ACTIVE, INACTIVE, SUSPENDED }
+
+public enum StudentStatus {
+    ACTIVE,
+    INACTIVE,
+    SUSPENDED,
+    PENDING
+}

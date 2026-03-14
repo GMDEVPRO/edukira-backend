@@ -23,6 +23,7 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+
   messages:
     basename: i18n/messages
     encoding: UTF-8
