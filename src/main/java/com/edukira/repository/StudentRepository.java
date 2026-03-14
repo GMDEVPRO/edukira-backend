@@ -1,18 +1,25 @@
 package com.edukira.repository;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 94be4867219629388a5124e0c6675443891a295c
 import com.edukira.entity.Student;
 import com.edukira.enums.StudentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 94be4867219629388a5124e0c6675443891a295c
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface StudentRepository extends JpaRepository<Student, UUID> {
+<<<<<<< HEAD
 
     Page<Student> findBySchoolId(UUID schoolId, Pageable pageable);
 
@@ -24,6 +31,11 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
 
     Optional<Student> findByIdAndSchoolId(UUID id, UUID schoolId);
 
+=======
+    Page<Student> findBySchoolIdAndStatus(UUID schoolId, StudentStatus status, Pageable pageable);
+    List<Student> findBySchoolIdAndClassLevel(UUID schoolId, String classLevel);
+    Optional<Student> findByIdAndSchoolId(UUID id, UUID schoolId);
+>>>>>>> 94be4867219629388a5124e0c6675443891a295c
     long countBySchoolIdAndStatus(UUID schoolId, StudentStatus status);
 
     @Query("SELECT s FROM Student s WHERE s.school.id = :schoolId AND s.updatedAt > :since")
