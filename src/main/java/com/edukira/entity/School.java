@@ -22,7 +22,7 @@ public class School {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, length = 3)
+    @Column(nullable = false, length = 50)
     private String country;   // SN, CI, ML...
 
     private String city;

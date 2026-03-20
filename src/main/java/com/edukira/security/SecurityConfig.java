@@ -23,10 +23,20 @@ public class SecurityConfig {
     private static final String[] PUBLIC_URLS = {
             // Staff auth
             "/v1/auth/**",
-            // Student auth (registo e login públicos)
+            // Student auth
             "/v1/student/auth/register",
             "/v1/student/auth/login",
             "/v1/student/auth/logout",
+            // Registo público de escola ← NOVO
+            "/v1/register",
+            // Matrícula pública ← NOVO
+            "/v1/enrollments/public/**",
+            // Países ← NOVO
+            "/v1/countries",
+            "/v1/countries/**",
+            // Marketplace público ← NOVO
+            "/v1/marketplace/products",
+            "/v1/marketplace/products/**",
             // Webhooks Mobile Money
             "/v1/payments/webhook",
             // Docs
