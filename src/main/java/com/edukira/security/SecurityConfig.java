@@ -27,14 +27,16 @@ public class SecurityConfig {
             "/v1/student/auth/register",
             "/v1/student/auth/login",
             "/v1/student/auth/logout",
-            // Registo público de escola ← NOVO
+            // Registo público de escola
             "/v1/register",
-            // Matrícula pública ← NOVO
+            // Leads da landing page (POST público, GET protegido via @PreAuthorize)
+            "/v1/leads",
+            // Matrícula pública
             "/v1/enrollments/public/**",
-            // Países ← NOVO
+            // Países
             "/v1/countries",
             "/v1/countries/**",
-            // Marketplace público ← NOVO
+            // Marketplace público
             "/v1/marketplace/products",
             "/v1/marketplace/products/**",
             // Webhooks Mobile Money
@@ -43,7 +45,9 @@ public class SecurityConfig {
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
-            "/actuator/health"
+            "/actuator/health",
+            "/v1/rankings/national/**",
+            "/v1/rankings/global",
     };
 
     @Bean

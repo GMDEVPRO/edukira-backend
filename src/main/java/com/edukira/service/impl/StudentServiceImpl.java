@@ -4,6 +4,7 @@ import com.edukira.dto.request.StudentRequest;
 import com.edukira.dto.response.StudentResponse;
 import com.edukira.entity.School;
 import com.edukira.entity.Student;
+import com.edukira.enums.Language;
 import com.edukira.enums.StudentStatus;
 import com.edukira.exception.EdukiraException;
 import com.edukira.repository.SchoolRepository;
@@ -86,14 +87,14 @@ public class StudentServiceImpl implements StudentService {
 
     private StudentResponse toResponse(Student s) {
         return StudentResponse.builder()
-                .id(s.getId().toString())
+                .id(UUID.fromString(s.getId().toString()))
                 .firstName(s.getFirstName())
                 .lastName(s.getLastName())
                 .classLevel(s.getClassLevel())
                 .guardianName(s.getGuardianName())
                 .guardianPhone(s.getGuardianPhone())
-                .guardianLanguage(s.getGuardianLanguage() != null ? s.getGuardianLanguage().name() : null)
-                .status(s.getStatus().name())
+                .guardianLanguage(s.getGuardianLanguage() != null ? Language.valueOf(s.getGuardianLanguage().name()) : null)
+                .status(StudentStatus.valueOf(s.getStatus().name()))
                 .enrollmentDate(s.getEnrollmentDate())
                 .build();
     }

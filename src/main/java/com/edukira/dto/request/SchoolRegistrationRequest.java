@@ -52,6 +52,10 @@ public class SchoolRegistrationRequest {
     @NotBlank
     private String adminPassword;
 
+    // Documento de identidade do responsável
+    private String adminIdType;   // NIF, BI, PASSPORT, CNIB, etc.
+    private String adminIdNumber;
+
     @NotBlank
     private String plan;
 
