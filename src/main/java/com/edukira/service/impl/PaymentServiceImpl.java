@@ -11,6 +11,7 @@ import com.edukira.repository.PaymentRepository;
 import com.edukira.repository.SchoolRepository;
 import com.edukira.repository.StudentRepository;
 import com.edukira.service.PaymentService;
+import com.edukira.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository  paymentRepo;
     private final StudentRepository  studentRepo;
     private final SchoolRepository   schoolRepo;
+    private final NotificationService notificationService;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -202,6 +204,15 @@ public class PaymentServiceImpl implements PaymentService {
             p.setTransactionId((String) data.getOrDefault("transaction_id", sessionId));
             paymentRepo.save(p);
             log.info("[WAVE-WEBHOOK] Confirmado: session={}", sessionId);
+            // ── Notificação ao responsável ────────────────────────────
+            if (p.getStudent() != null) {
+                Student s = p.getStudent();
+                notificationService.notifyPaymentConfirmed(
+                        p.getSchool().getId(), s.getId(),
+                        s.getFirstName() + " " + s.getLastName(),
+                        s.getGuardianPhone(), s.getGuardianName(),
+                        p.getAmount().toPlainString(), p.getCurrency(), p.getMonth());
+            }
         }, () -> log.warn("[WAVE-WEBHOOK] Não encontrado: session={}", sessionId));
     }
 

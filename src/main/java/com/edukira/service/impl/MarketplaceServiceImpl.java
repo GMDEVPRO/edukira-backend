@@ -4,9 +4,13 @@ import com.edukira.dto.request.*;
 import com.edukira.dto.response.*;
 import com.edukira.entity.*;
 import com.edukira.enums.*;
+import com.edukira.exception.EdukiraException;
 import com.edukira.repository.*;
 import com.edukira.security.SchoolContext;
 import com.edukira.service.MarketplaceService;
+import com.edukira.service.WalletService;
+import com.edukira.service.CommissionService;
+import com.edukira.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +33,9 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     private final MarketplaceOrderRepository     orderRepo;
     private final MarketplaceWithdrawalRepository withdrawalRepo;
     private final UserProfileRepository          userProfileRepo;
+    private final WalletService                  walletService;
+    private final CommissionService              commissionService;
+    private final NotificationService            notificationService;
 
 
     // ════════════════════════════════
@@ -196,22 +203,17 @@ public class MarketplaceServiceImpl implements MarketplaceService {
             throw new RuntimeException("Ce produit n'est pas disponible.");
         }
 
-        BigDecimal price      = product.getPrice();
-        BigDecimal commRate   = product.getSeller().getCommissionRate();
-        BigDecimal commAmt    = price.multiply(commRate).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-        BigDecimal sellerAmt  = price.subtract(commAmt);
+        BigDecimal price     = product.getPrice();
+        BigDecimal commRate  = product.getSeller().getCommissionRate();
+        BigDecimal commAmt   = price.multiply(commRate).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal sellerAmt = price.subtract(commAmt);
 
-        // Créditer le wallet du vendeur
-        MarketplaceSeller seller = product.getSeller();
-        seller.setWalletBalance(seller.getWalletBalance().add(sellerAmt));
-        sellerRepo.save(seller);
-
-        // Incrémenter les downloads
+        // Incrementar downloads
         product.setDownloads(product.getDownloads() + 1);
         productRepo.save(product);
 
         UserProfile buyer = userProfileRepo.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+                .orElseThrow(() -> EdukiraException.notFound("Utilisateur"));
 
         MarketplaceOrder order = MarketplaceOrder.builder()
                 .product(product)
@@ -227,7 +229,33 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 .build();
 
         orderRepo.save(order);
-        log.info("[MARKETPLACE] Achat | produit={} acheteur={} montant={}", productId, userId, price);
+
+        // ── Wallet: creditar vendedor via WalletService ──────────────
+        MarketplaceSeller seller = product.getSeller();
+        walletService.credit(
+                seller.getId(), sellerAmt, product.getCurrency(),
+                order.getId(),
+                "Venda: " + product.getTitle());
+
+        // ── Commission: registar comissão Edukira ────────────────────
+        commissionService.record(order);
+
+        // ── Notificação ao vendedor ──────────────────────────────────
+        UUID sellerSchoolId = seller.getUserProfile() != null
+                && seller.getUserProfile().getSchool() != null
+                ? seller.getUserProfile().getSchool().getId() : null;
+        if (sellerSchoolId != null && seller.getMobileMoneyNumber() != null) {
+            notificationService.notifyMarketplaceSale(
+                    sellerSchoolId,
+                    seller.getMobileMoneyNumber(),
+                    seller.getDisplayName(),
+                    product.getTitle(),
+                    sellerAmt.toPlainString(),
+                    product.getCurrency());
+        }
+
+        log.info("[MARKETPLACE] Achat | produit={} acheteur={} montant={} comm={}",
+                productId, userId, price, commAmt);
         return toOrderResponse(order);
     }
 
@@ -253,21 +281,15 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     @Override
     @Transactional
     public WithdrawalResponse requestWithdrawal(WithdrawalRequest req) {
-        UUID userId   = SchoolContext.getUserId();
+        UUID userId = SchoolContext.getUserId();
         MarketplaceSeller seller = sellerRepo.findByUserProfileId(userId)
-                .orElseThrow(() -> new RuntimeException("Profil vendeur introuvable"));
+                .orElseThrow(() -> EdukiraException.notFound("Perfil de vendedor"));
 
         if (withdrawalRepo.existsBySellerIdAndStatus(seller.getId(), WithdrawalStatus.PENDING)) {
-            throw new RuntimeException("Vous avez déjà un retrait en attente.");
-        }
-        if (req.getAmount().compareTo(seller.getWalletBalance()) > 0) {
-            throw new RuntimeException("Solde insuffisant.");
+            throw EdukiraException.badRequest("Vous avez déjà un retrait en attente.");
         }
 
-        // Débiter le wallet
-        seller.setWalletBalance(seller.getWalletBalance().subtract(req.getAmount()));
-        sellerRepo.save(seller);
-
+        // ── Debitar via WalletService (valida saldo internamente) ────
         MarketplaceWithdrawal withdrawal = MarketplaceWithdrawal.builder()
                 .seller(seller)
                 .amount(req.getAmount())
@@ -284,6 +306,12 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 .build();
 
         withdrawalRepo.save(withdrawal);
+
+        walletService.debit(
+                seller.getId(), req.getAmount(), "XOF",
+                withdrawal.getId(),
+                "Saque solicitado via " + req.getWithdrawalMethod());
+
         log.info("[MARKETPLACE] Retrait demandé | vendeur={} montant={} méthode={}",
                 seller.getId(), req.getAmount(), req.getWithdrawalMethod());
         return toWithdrawalResponse(withdrawal);

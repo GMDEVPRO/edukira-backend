@@ -21,27 +21,18 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
 
     private static final String[] PUBLIC_URLS = {
-            // Staff auth
             "/v1/auth/**",
-            // Student auth
             "/v1/student/auth/register",
             "/v1/student/auth/login",
             "/v1/student/auth/logout",
-            // Registo público de escola
             "/v1/register",
-            // Leads da landing page (POST público, GET protegido via @PreAuthorize)
             "/v1/leads",
-            // Matrícula pública
             "/v1/enrollments/public/**",
-            // Países
             "/v1/countries",
             "/v1/countries/**",
-            // Marketplace público
             "/v1/marketplace/products",
             "/v1/marketplace/products/**",
-            // Webhooks Mobile Money
             "/v1/payments/webhook",
-            // Docs
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
@@ -64,6 +55,14 @@ public class SecurityConfig {
                         .requestMatchers("/v1/student/portal/documents").hasRole("STUDENT")
                         // Gestão de contas de aluno — só admins
                         .requestMatchers("/v1/student/portal/admin/**").hasAnyRole("SCHOOL_ADMIN","ADMIN")
+                        // Wallet — seller autenticado
+                        .requestMatchers("/v1/wallet/**").authenticated()
+                        // Commission admin
+                        .requestMatchers("/v1/commissions/summary").hasAnyRole("SCHOOL_ADMIN","ADMIN")
+                        .requestMatchers("/v1/commissions").hasAnyRole("SCHOOL_ADMIN","ADMIN")
+                        .requestMatchers("/v1/commissions/me").authenticated()
+                        // Notifications admin
+                        .requestMatchers("/v1/notifications/**").hasAnyRole("SCHOOL_ADMIN","ADMIN")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

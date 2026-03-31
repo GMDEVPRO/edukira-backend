@@ -11,6 +11,7 @@ import com.edukira.repository.AttendanceRepository;
 import com.edukira.repository.StudentRepository;
 import com.edukira.repository.UserProfileRepository;
 import com.edukira.service.AttendanceService;
+import com.edukira.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,9 +27,10 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AttendanceServiceImpl implements AttendanceService {
 
-    private final AttendanceRepository attendanceRepo;
-    private final StudentRepository studentRepo;
-    private final UserProfileRepository userProfileRepo;
+    private final AttendanceRepository   attendanceRepo;
+    private final StudentRepository      studentRepo;
+    private final UserProfileRepository  userProfileRepo;
+    private final NotificationService    notificationService;
 
     @Override
     @Transactional
@@ -51,7 +53,23 @@ public class AttendanceServiceImpl implements AttendanceService {
             att.setStatus(entry.getStatus());
             att.setObservation(entry.getObservation());
             att.setRecordedBy(recorder);
-            return attendanceRepo.save(att);
+            Attendance saved2 = attendanceRepo.save(att);
+
+            // ── Notificação ao responsável ───────────────────────────
+            if (entry.getStatus() == AttendanceStatus.ABSENT) {
+                notificationService.notifyAbsence(
+                        schoolId, student.getId(),
+                        student.getFirstName() + " " + student.getLastName(),
+                        student.getGuardianPhone(), student.getGuardianName(),
+                        request.getDate().toString(), request.getSubject());
+            } else if (entry.getStatus() == AttendanceStatus.LATE) {
+                notificationService.notifyLate(
+                        schoolId, student.getId(),
+                        student.getFirstName() + " " + student.getLastName(),
+                        student.getGuardianPhone(), student.getGuardianName(),
+                        request.getDate().toString());
+            }
+            return saved2;
         }).collect(Collectors.toList());
 
         return buildSummary(classLevel, request.getDate(), request.getSubject(), saved);
