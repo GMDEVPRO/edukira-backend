@@ -10,21 +10,38 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/payments")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Payments", description = "Pagamentos & Mobile Money")
 public class PaymentController {
 
     private final PaymentService paymentService;
+
+    @Value("${edukira.wave.webhook-secret:}")
+    private String waveWebhookSecret;
+
+    @Value("${edukira.orange-money.webhook-secret:}")
+    private String orangeWebhookSecret;
+
+    @Value("${edukira.mtn-momo.webhook-secret:}")
+    private String mtnWebhookSecret;
 
     @GetMapping
     @SecurityRequirement(name = "bearerAuth")
@@ -55,17 +72,75 @@ public class PaymentController {
     @Operation(summary = "Webhook unificado — Wave / Orange / MTN (público)")
     public ResponseEntity<Void> webhook(
             @RequestHeader Map<String, String> headers,
-            @RequestBody Map<String, Object> payload) {
-        // Detecta provider pelo header ou campo do body
-        String provider = detectProvider(headers, payload);
+            @RequestBody String rawBody) {
+
+        String provider = detectProvider(headers, rawBody);
+
+        // ── Validação de assinatura HMAC ─────────────────────────────
+        if (!validateSignature(provider, headers, rawBody)) {
+            log.warn("[WEBHOOK] Assinatura inválida | provider={}", provider);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // Parse manual do body após validação
+        Map<String, Object> payload = parseJson(rawBody);
         paymentService.processWebhook(provider, payload);
         return ResponseEntity.ok().build();
     }
 
-    private String detectProvider(Map<String, String> headers, Map<String, Object> payload) {
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    private String detectProvider(Map<String, String> headers, String body) {
         if (headers.containsKey("x-wave-signature")) return "WAVE";
-        if (payload.containsKey("pay_token") || payload.containsKey("order_id")) return "ORANGE_MONEY";
-        if (payload.containsKey("referenceId") || payload.containsKey("financialTransactionId")) return "MTN_MOMO";
+        if (body.contains("pay_token") || body.contains("order_id")) return "ORANGE_MONEY";
+        if (body.contains("referenceId") || body.contains("financialTransactionId")) return "MTN_MOMO";
         return "UNKNOWN";
+    }
+
+    private boolean validateSignature(String provider, Map<String, String> headers, String body) {
+        try {
+            return switch (provider) {
+                case "WAVE" -> {
+                    if (waveWebhookSecret.isBlank()) { log.warn("[WEBHOOK] WAVE secret não configurado — modo sandbox"); yield true; }
+                    String sig = headers.getOrDefault("x-wave-signature", "");
+                    yield sig.equals(hmacSha256(waveWebhookSecret, body));
+                }
+                case "ORANGE_MONEY" -> {
+                    if (orangeWebhookSecret.isBlank()) { log.warn("[WEBHOOK] ORANGE secret não configurado — modo sandbox"); yield true; }
+                    String sig = headers.getOrDefault("x-orange-signature", "");
+                    yield sig.equals(hmacSha256(orangeWebhookSecret, body));
+                }
+                case "MTN_MOMO" -> {
+                    if (mtnWebhookSecret.isBlank()) { log.warn("[WEBHOOK] MTN secret não configurado — modo sandbox"); yield true; }
+                    String sig = headers.getOrDefault("x-callback-token", "");
+                    yield sig.equals(mtnWebhookSecret); // MTN usa token fixo
+                }
+                default -> {
+                    log.warn("[WEBHOOK] Provider desconhecido — rejeitado");
+                    yield false;
+                }
+            };
+        } catch (Exception e) {
+            log.error("[WEBHOOK] Erro na validação de assinatura: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private String hmacSha256(String secret, String data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+        return HexFormat.of().formatHex(hash);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseJson(String raw) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper =
+                    new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.readValue(raw, Map.class);
+        } catch (Exception e) {
+            return Map.of();
+        }
     }
 }

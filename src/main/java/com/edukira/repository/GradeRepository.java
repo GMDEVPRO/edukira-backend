@@ -14,6 +14,9 @@ public interface GradeRepository extends JpaRepository<Grade, UUID> {
 
     List<Grade> findByStudentIdAndPeriodAndYear(UUID studentId, GradePeriod period, String year);
 
+    List<Grade> findByStudentIdAndSchoolIdAndPeriodAndYear(
+            UUID studentId, UUID schoolId, GradePeriod period, String year);
+
     List<Grade> findByStudentIdAndYear(UUID studentId, String year);
 
     @Query("SELECT g FROM Grade g WHERE g.school.id = :schoolId " +
@@ -28,5 +31,7 @@ public interface GradeRepository extends JpaRepository<Grade, UUID> {
     Optional<Grade> findByIdAndSchoolId(UUID id, UUID schoolId);
 
     List<Grade> findBySchoolIdAndUpdatedAtAfter(UUID schoolId, Instant since);
+
+
 }
 

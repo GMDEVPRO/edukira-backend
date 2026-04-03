@@ -1,5 +1,6 @@
 package com.edukira.service.impl;
 
+
 import com.edukira.dto.request.PaymentInitRequest;
 import com.edukira.dto.response.PaymentResponse;
 import com.edukira.entity.Payment;
@@ -38,6 +39,12 @@ public class PaymentServiceImpl implements PaymentService {
     private final NotificationService notificationService;
 
     private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${edukira.mtn-momo.api-user-id:}")
+    private String globalMtnApiUserId;
+
+    @Value("${edukira.mtn-momo.api-user-key:}")
+    private String globalMtnApiUserKey;
 
     @Value("${edukira.wave.api-key:}")
     private String globalWaveApiKey;
@@ -312,53 +319,63 @@ public class PaymentServiceImpl implements PaymentService {
         }, () -> log.warn("[ORANGE-WEBHOOK] Não encontrado: pay_token={}", payToken));
     }
 
+    // ── dentro de PaymentServiceImpl ──────────────────────────────────
+
     private Map<String, Object> initMtnMomo(PaymentInitRequest req, School school, Payment payment) {
         String subscriptionKey = nonEmpty(school.getMtnSubscriptionKey(), globalMtnSubscriptionKey);
 
+        // ── Sandbox automático se sem credenciais ────────────────────
         if (subscriptionKey.isEmpty()) {
             String mockRef = "MTN_SANDBOX_" + UUID.randomUUID();
             payment.setSessionId(mockRef);
             log.info("[MTN-SANDBOX] referenceId={}", mockRef);
             return Map.of(
-                    "provider", "MTN_MOMO",
-                    "reference_id", mockRef,
-                    "status", "PENDING",
-                    "sandbox", true,
-                    "message", "Pedido enviado ao telemóvel do cliente"
+                    "provider",      "MTN_MOMO",
+                    "reference_id",  mockRef,
+                    "status",        "PENDING",
+                    "sandbox",       true,
+                    "message",       "Pedido enviado ao telemóvel do cliente"
             );
         }
 
         try {
             String baseUrl     = "sandbox".equals(mtnEnvironment) ? MTN_BASE_SBX : MTN_BASE_PROD;
             String referenceId = UUID.randomUUID().toString();
-            String targetPhone = req.getPhone() != null ? req.getPhone().replaceAll("[^0-9]", "") : "";
+            String targetPhone = req.getPhone() != null
+                    ? req.getPhone().replaceAll("[^0-9]", "") : "";
 
+            // ── PASSO 1: Obter Bearer token OAuth2 ──────────────────
+            String bearerToken = getMtnBearerToken(baseUrl, subscriptionKey);
+
+            // ── PASSO 2: RequestToPay ────────────────────────────────
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("X-Reference-Id", referenceId);
+            headers.setBearerAuth(bearerToken);
+            headers.set("X-Reference-Id",       referenceId);
             headers.set("X-Target-Environment", mtnEnvironment);
             headers.set("Ocp-Apim-Subscription-Key", subscriptionKey);
 
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("amount", req.getAmount().toPlainString());
-            body.put("currency", req.getCurrency() != null ? req.getCurrency() : "XOF");
+            body.put("amount",     req.getAmount().toPlainString());
+            body.put("currency",   req.getCurrency() != null ? req.getCurrency() : "XOF");
             body.put("externalId", payment.getMonth() + "_" + req.getStudentId());
-            body.put("payer", Map.of("partyIdType", "MSISDN", "partyId", targetPhone));
+            body.put("payer",      Map.of("partyIdType", "MSISDN", "partyId", targetPhone));
             body.put("payerMessage", "Mensalidade Edukira " + payment.getMonth());
-            body.put("payeeNote", "Escola " + school.getName());
+            body.put("payeeNote",    "Escola " + school.getName());
 
             restTemplate.postForEntity(
                     baseUrl + "/collection/v1_0/requesttopay",
-                    new HttpEntity<>(body, headers), Void.class);
+                    new HttpEntity<>(body, headers),
+                    Void.class);
 
             payment.setSessionId(referenceId);
-            log.info("[MTN] RequestToPay: referenceId={}", referenceId);
+            log.info("[MTN] RequestToPay enviado | referenceId={}", referenceId);
 
             return Map.of(
-                    "provider", "MTN_MOMO",
+                    "provider",     "MTN_MOMO",
                     "reference_id", referenceId,
-                    "status", "PENDING",
-                    "message", "Pedido enviado. Aguarda confirmação."
+                    "status",       "PENDING",
+                    "message",      "Pedido enviado. Aguarda confirmação no telemóvel."
             );
 
         } catch (Exception e) {
@@ -367,6 +384,47 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    /**
+     * PASSO 1 — Obtém o Bearer token OAuth2 da MTN MoMo.
+     *
+     * POST {baseUrl}/collection/token/
+     * Authorization: Basic Base64(apiUserId:apiUserKey)
+     * Ocp-Apim-Subscription-Key: {subscriptionKey}
+     *
+     * Retorna: { "access_token": "...", "token_type": "access_token", "expires_in": 3600 }
+     */
+    private String getMtnBearerToken(String baseUrl, String subscriptionKey) {
+        // Em produção o apiUserId e apiUserKey são gerados via /v1_0/apiuser
+        // e guardados nas variáveis de ambiente MTN_API_USER_ID e MTN_API_USER_KEY
+        String apiUserId  = nonEmpty(globalMtnApiUserId,  "sandbox_user");
+        String apiUserKey = nonEmpty(globalMtnApiUserKey, "sandbox_key");
+
+        String credentials = Base64.getEncoder().encodeToString(
+                (apiUserId + ":" + apiUserKey).getBytes());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization",             "Basic " + credentials);
+        headers.set("Ocp-Apim-Subscription-Key", subscriptionKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        try {
+            ResponseEntity<Map> resp = restTemplate.postForEntity(
+                    baseUrl + "/collection/token/",
+                    new HttpEntity<>(headers),
+                    Map.class);
+
+            String token = (String) resp.getBody().get("access_token");
+            if (token == null || token.isBlank()) {
+                throw new RuntimeException("MTN não retornou access_token");
+            }
+            log.info("[MTN] Bearer token obtido com sucesso");
+            return token;
+
+        } catch (Exception e) {
+            log.error("[MTN] Falha ao obter Bearer token: {}", e.getMessage());
+            throw EdukiraException.badRequest("MTN MoMo auth falhou: " + e.getMessage());
+        }
+    }
     private void processMtnWebhook(Map<String, Object> payload) {
         String referenceId = (String) payload.get("referenceId");
         String status      = (String) payload.getOrDefault("status", "");

@@ -1,8 +1,10 @@
 package com.edukira.security;
 
+import com.edukira.exception.EdukiraException;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import java.util.Map;
 import java.util.UUID;
@@ -13,14 +15,16 @@ public class SchoolContext {
         Map<String, String> details = getDetails();
         String schoolId = details.get("schoolId");
         if (schoolId == null || schoolId.isBlank()) {
-            throw new RuntimeException("schoolId não encontrado no token");
+            throw new EdukiraException("schoolId não encontrado no token", HttpStatus.UNAUTHORIZED);
         }
         return UUID.fromString(schoolId);
     }
 
     public static UUID getUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) throw new RuntimeException("Utilizador não autenticado");
+        if (auth == null) {
+            throw new EdukiraException("Utilizador não autenticado", HttpStatus.UNAUTHORIZED);
+        }
         try {
             return UUID.fromString(auth.getName());
         } catch (Exception e) {
@@ -48,6 +52,6 @@ public class SchoolContext {
                 return (Map<String, String>) token.getDetails();
             }
         }
-        throw new RuntimeException("Detalhes do token não encontrados");
+        throw new EdukiraException("Detalhes do token não encontrados", HttpStatus.UNAUTHORIZED);
     }
 }

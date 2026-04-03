@@ -2,6 +2,7 @@ package com.edukira.entity;
 
 import com.edukira.enums.Language;
 import com.edukira.enums.SchoolType;
+import com.edukira.util.AesEncryptor;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -36,16 +37,16 @@ public class School {
     private Language defaultLanguage;
 
     // Mobile Money credentials (encrypted in prod via env vars)
-    @Column(name = "wave_api_key")
+    @Convert(converter = AesEncryptor.class)
     private String waveApiKey;
 
-    @Column(name = "orange_api_key")
+    @Convert(converter = AesEncryptor.class)
     private String orangeApiKey;
 
-    @Column(name = "mtn_subscription_key")
+    @Convert(converter = AesEncryptor.class)
     private String mtnSubscriptionKey;
 
-    @Column(name = "africas_talking_key")
+    @Convert(converter = AesEncryptor.class)
     private String africasTalkingKey;
 
     @Column(nullable = false)

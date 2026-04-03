@@ -1,5 +1,7 @@
 package com.edukira.service.impl;
 
+
+
 import com.edukira.dto.request.*;
 import com.edukira.dto.response.*;
 import com.edukira.entity.*;
@@ -15,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +50,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     public SellerResponse registerSeller(SellerRequest req) {
         UUID userId   = SchoolContext.getUserId();
         if (sellerRepo.existsByUserProfileId(userId)) {
-            throw new RuntimeException("Vous êtes déjà enregistré comme vendeur.");
+            throw new EdukiraException("Vous êtes déjà enregistré comme vendeur.", HttpStatus.CONFLICT);
         }
         UserProfile user = userProfileRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
@@ -107,7 +110,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 .orElseThrow(() -> new RuntimeException("Profil vendeur introuvable"));
 
         if (seller.getStatus() != SellerStatus.APPROVED) {
-            throw new RuntimeException("Votre compte vendeur n'est pas encore approuvé.");
+            throw new EdukiraException("Votre compte vendeur n'est pas encore approuvé.", HttpStatus.FORBIDDEN);
         }
 
         MarketplaceProduct product = MarketplaceProduct.builder()
@@ -193,14 +196,14 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         UUID schoolId = SchoolContext.getSchoolId();
 
         if (orderRepo.existsByProductIdAndBuyerSchoolId(productId, schoolId)) {
-            throw new RuntimeException("Vous avez déjà acheté ce produit.");
+            throw new EdukiraException("Vous avez déjà acheté ce produit.", HttpStatus.CONFLICT);
         }
 
         MarketplaceProduct product = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Produit introuvable"));
 
         if (product.getStatus() != ProductStatus.APPROVED) {
-            throw new RuntimeException("Ce produit n'est pas disponible.");
+            throw new EdukiraException("Ce produit n'est pas disponible.", HttpStatus.BAD_REQUEST);
         }
 
         BigDecimal price     = product.getPrice();

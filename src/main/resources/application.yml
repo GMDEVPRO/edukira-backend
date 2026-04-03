@@ -10,7 +10,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate        # Flyway gere o schema — nunca usar create/update em prod
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -22,7 +22,6 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
-
 
   messages:
     basename: i18n/messages
@@ -38,24 +37,34 @@ server:
 edukira:
   jwt:
     secret: ${JWT_SECRET:edukira-super-secret-key-change-in-production-min-256bits}
-    expiration-ms: 900000          # 15 minutos
-    refresh-expiration-ms: 604800000  # 7 dias
+    expiration-ms: 900000
+    refresh-expiration-ms: 604800000
+
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:3000}
+
+  encryption:
+    secret-key: ${ENCRYPTION_KEY:K7gNU3sdo+OL0wNhqoVWhr5v6s1xYv72ol/pe/Unols=}
 
   # ── Mobile Money ─────────────────────────────
   wave:
     api-key: ${WAVE_API_KEY:}
     base-url: https://api.wave.com/v1
+    webhook-secret: ${WAVE_WEBHOOK_SECRET:}
 
   orange-money:
     client-id: ${ORANGE_CLIENT_ID:}
     client-secret: ${ORANGE_CLIENT_SECRET:}
     base-url: https://api.orange.com/orange-money-webpay/ci/v1
     token-url: https://api.orange.com/oauth/v3/token
+    webhook-secret: ${ORANGE_WEBHOOK_SECRET:}
 
   mtn-momo:
     subscription-key: ${MTN_SUBSCRIPTION_KEY:}
-    base-url: https://proxy.momoapi.mtn.com
+    base-url: ${MTN_BASE_URL:https://proxy.momoapi.mtn.com}
     environment: ${MTN_ENVIRONMENT:sandbox}
+    webhook-secret: ${MTN_WEBHOOK_SECRET:}
+    api-user-id: ${MTN_API_USER_ID:}
+    api-user-key: ${MTN_API_USER_KEY:}
 
   # ── SMS / WhatsApp ────────────────────────────
   africas-talking:
@@ -89,4 +98,5 @@ management:
 logging:
   level:
     com.edukira: DEBUG
-    org.springframework.security: INFO
+    org.springframework.security: WARN   # ← era INFO
+

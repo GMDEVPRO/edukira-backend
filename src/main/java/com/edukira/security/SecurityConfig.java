@@ -48,6 +48,7 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_URLS).permitAll()
+                        .requestMatchers("/v1/pdf/**").authenticated()
                         // Portal do aluno — só STUDENT
                         .requestMatchers("/v1/student/portal/me/**").hasRole("STUDENT")
                         .requestMatchers("/v1/student/portal/grades").hasRole("STUDENT")
