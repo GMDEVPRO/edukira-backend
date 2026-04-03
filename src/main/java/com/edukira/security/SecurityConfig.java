@@ -49,21 +49,24 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_URLS).permitAll()
                         .requestMatchers("/v1/pdf/**").authenticated()
+                        // Upload
+                        .requestMatchers("/v1/upload/**").authenticated()
                         // Portal do aluno — só STUDENT
                         .requestMatchers("/v1/student/portal/me/**").hasRole("STUDENT")
                         .requestMatchers("/v1/student/portal/grades").hasRole("STUDENT")
                         .requestMatchers("/v1/student/portal/payments").hasRole("STUDENT")
                         .requestMatchers("/v1/student/portal/documents").hasRole("STUDENT")
                         // Gestão de contas de aluno — só admins
-                        .requestMatchers("/v1/student/portal/admin/**").hasAnyRole("SCHOOL_ADMIN","ADMIN")
+                        .requestMatchers("/v1/student/portal/admin/**").hasAnyRole("SCHOOL_ADMIN", "ADMIN")
                         // Wallet — seller autenticado
                         .requestMatchers("/v1/wallet/**").authenticated()
                         // Commission admin
-                        .requestMatchers("/v1/commissions/summary").hasAnyRole("SCHOOL_ADMIN","ADMIN")
-                        .requestMatchers("/v1/commissions").hasAnyRole("SCHOOL_ADMIN","ADMIN")
+                        .requestMatchers("/v1/commissions/summary").hasAnyRole("SCHOOL_ADMIN", "ADMIN")
+                        .requestMatchers("/v1/commissions").hasAnyRole("SCHOOL_ADMIN", "ADMIN")
                         .requestMatchers("/v1/commissions/me").authenticated()
                         // Notifications admin
-                        .requestMatchers("/v1/notifications/**").hasAnyRole("SCHOOL_ADMIN","ADMIN")
+                        .requestMatchers("/v1/notifications/**").hasAnyRole("SCHOOL_ADMIN", "ADMIN")
+                        // anyRequest SEMPRE por último
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

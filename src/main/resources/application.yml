@@ -35,6 +35,30 @@ server:
 
 # ── JWT ──────────────────────────────────────────
 edukira:
+
+  # ── Cloudinary (imagens: capas, thumbnails) ────────────
+  cloudinary:
+    cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+    api-key: ${CLOUDINARY_API_KEY:}
+    api-secret: ${CLOUDINARY_API_SECRET:}
+    folder: ${CLOUDINARY_FOLDER:edukira/marketplace}
+
+  # ── Backblaze B2 (ficheiros: PDFs, vídeos) ─────────────
+  backblaze:
+    endpoint: ${B2_ENDPOINT:https://s3.us-west-004.backblazeb2.com}
+    bucket-name: ${B2_BUCKET_NAME:edukira-marketplace}
+    key-id: ${B2_KEY_ID:}
+    app-key: ${B2_APP_KEY:}
+    public-url: ${B2_PUBLIC_URL:}   # URL pública do bucket (ex: https://f004.backblazeb2.com/file/edukira-marketplace)
+
+  # ── Upload limits ───────────────────────────────────────
+  spring:
+    servlet:
+      multipart:
+        enabled: true
+        max-file-size: 500MB
+        max-request-size: 510MB
+
   jwt:
     secret: ${JWT_SECRET:edukira-super-secret-key-change-in-production-min-256bits}
     expiration-ms: 900000
@@ -44,6 +68,8 @@ edukira:
 
   encryption:
     secret-key: ${ENCRYPTION_KEY:K7gNU3sdo+OL0wNhqoVWhr5v6s1xYv72ol/pe/Unols=}
+
+
 
   # ── Mobile Money ─────────────────────────────
   wave:
